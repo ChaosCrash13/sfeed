@@ -43,7 +43,7 @@
 
 /* color-theme */
 #ifndef SFEED_THEME
-#define SFEED_THEME "themes/mono.h"
+#define SFEED_THEME "themes/newsboat.h"
 #endif
 #include SFEED_THEME
 
@@ -52,7 +52,8 @@ enum {
 };
 
 enum Layout {
-	LayoutVertical = 0, LayoutHorizontal, LayoutMonocle, LayoutLast
+//	LayoutMonocle = 0, LayoutHorizontal, LayoutMonocle, LayoutLast
+	LayoutMonocle = 0 // LayoutHorizontal, LayoutMonocle, LayoutLast
 };
 
 enum Pane { PaneFeeds, PaneItems, PaneLast };
@@ -159,9 +160,11 @@ static struct scrollbar scrollbars[PaneLast]; /* each pane has a scrollbar */
 static struct win win;
 static size_t selpane;
 /* fixed sidebar size, < 0 is automatic */
-static int fixedsidebarsizes[LayoutLast] = { -1, -1, -1 };
-static int layout = LayoutVertical, prevlayout = LayoutVertical;
-static int onlynew = 0; /* show only new in sidebar */
+//static int fixedsidebarsizes[LayoutLast] = { -1, -1, -1 };
+//static int layout = LayoutVertical, prevlayout = LayoutVertical;
+static int layout = LayoutMonocle;
+
+static int onlynew = 1; /* show only new in sidebar */
 static int usemouse = 1; /* use xterm mouse tracking */
 
 static struct termios tsave; /* terminal state at startup */
@@ -174,7 +177,9 @@ static struct feed *curfeed;
 static size_t nfeeds; /* amount of feeds */
 static time_t comparetime;
 static struct urls urls;
-static char *urlfile;
+//static char *urlfile;
+static char *urlfile = "/home/user/.sfeed/urls";
+
 
 volatile sig_atomic_t state_sigchld = 0, state_sighup = 0, state_sigint = 0;
 volatile sig_atomic_t state_sigterm = 0, state_sigwinch = 0;
@@ -182,8 +187,9 @@ volatile sig_atomic_t state_sigterm = 0, state_sigwinch = 0;
 static char *plumbercmd = "xdg-open"; /* env variable: $SFEED_PLUMBER */
 static char *pipercmd = "sfeed_content"; /* env variable: $SFEED_PIPER */
 static char *yankercmd = "xclip -r"; /* env variable: $SFEED_YANKER */
-static char *markreadcmd = "sfeed_markread read"; /* env variable: $SFEED_MARK_READ */
-static char *markunreadcmd = "sfeed_markread unread"; /* env variable: $SFEED_MARK_UNREAD */
+static char *markreadcmd = "sfeed_markread"; /* env variable: $SFEED_MARK_READ */
+//static char *markreadcmd = "sfeed_markread read"; /* env variable: $SFEED_MARK_READ */
+//static char *markunreadcmd = "sfeed_markread unread"; /* env variable: $SFEED_MARK_UNREAD */
 static char *cmdenv; /* env variable: $SFEED_AUTOCMD */
 static int plumberia = 0; /* env variable: $SFEED_PLUMBER_INTERACTIVE */
 static int piperia = 1; /* env variable: $SFEED_PIPER_INTERACTIVE */
@@ -797,7 +803,7 @@ static void
 setlayout(int n)
 {
 	if (layout != LayoutMonocle)
-		prevlayout = layout; /* previous non-monocle layout */
+//		prevlayout = layout; /* previous non-monocle layout */
 	layout = n;
 }
 
@@ -808,7 +814,7 @@ updategeom(void)
 
 	panes[PaneFeeds].hidden = layout == LayoutMonocle && (selpane != PaneFeeds);
 	panes[PaneItems].hidden = layout == LayoutMonocle && (selpane != PaneItems);
-	linebar.hidden = layout != LayoutHorizontal;
+//	linebar.hidden = layout != LayoutHorizontal;
 
 	w = win.width;
 	/* always reserve space for statusbar */
@@ -818,33 +824,33 @@ updategeom(void)
 	panes[PaneFeeds].y = y;
 
 	switch (layout) {
-	case LayoutVertical:
-		panes[PaneFeeds].width = getsidebarsize();
-
-		x += panes[PaneFeeds].width;
-		w -= panes[PaneFeeds].width;
-
-		/* space for scrollbar if sidebar is visible */
-		w--;
-		x++;
-
-		panes[PaneFeeds].height = MAX(h, 1);
-		break;
-	case LayoutHorizontal:
-		panes[PaneFeeds].height = getsidebarsize();
-
-		h -= panes[PaneFeeds].height;
-		y += panes[PaneFeeds].height;
-
-		linebar.x = 0;
-		linebar.y = y;
-		linebar.width = win.width;
-
-		h--;
-		y++;
-
-		panes[PaneFeeds].width = MAX(w - 1, 0);
-		break;
+//	case LayoutVertical:
+//		panes[PaneFeeds].width = getsidebarsize();
+//
+//		x += panes[PaneFeeds].width;
+//		w -= panes[PaneFeeds].width;
+//
+//		/* space for scrollbar if sidebar is visible */
+//		w--;
+//		x++;
+//
+//		panes[PaneFeeds].height = MAX(h, 1);
+//		break;
+//	case LayoutHorizontal:
+//		panes[PaneFeeds].height = getsidebarsize();
+//
+//		h -= panes[PaneFeeds].height;
+//		y += panes[PaneFeeds].height;
+//
+//		linebar.x = 0;
+//		linebar.y = y;
+//		linebar.width = win.width;
+//
+//		h--;
+//		y++;
+//
+//		panes[PaneFeeds].width = MAX(w - 1, 0);
+//		break;
 	case LayoutMonocle:
 		panes[PaneFeeds].height = MAX(h, 1);
 		panes[PaneFeeds].width = MAX(w - 1, 0);
@@ -1467,71 +1473,71 @@ feed_yank_selected_item(struct pane *p, int field)
 }
 
 /* calculate optimal (default) size */
-static int
-getsidebarsizedefault(void)
-{
-	struct feed *feed;
-	size_t i;
-	int len, size;
+//static int
+//getsidebarsizedefault(void)
+//{
+//	struct feed *feed;
+//	size_t i;
+//	int len, size;
 
-	switch (layout) {
-	case LayoutVertical:
-		for (i = 0, size = 0; i < nfeeds; i++) {
-			feed = &feeds[i];
-			len = snprintf(NULL, 0, " (%lu/%lu)",
-			               feed->totalnew, feed->total) +
-				       colw(feed->name);
-			if (len > size)
-				size = len;
+//	switch (layout) {
+//	case LayoutVertical:
+//		for (i = 0, size = 0; i < nfeeds; i++) {
+//			feed = &feeds[i];
+//			len = snprintf(NULL, 0, " (%lu/%lu)",
+//			               feed->totalnew, feed->total) +
+//				       colw(feed->name);
+//			if (len > size)
+//				size = len;
+//
+//			if (onlynew && feed->totalnew == 0)
+//				continue;
+//		}
+//		return MAX(MIN(win.width - 1, size), 0);
+//	case LayoutHorizontal:
+//		for (i = 0, size = 0; i < nfeeds; i++) {
+//			feed = &feeds[i];
+//			if (onlynew && feed->totalnew == 0)
+//				continue;
+//			size++;
+//		}
+//		return MAX(MIN((win.height - 1) / 2, size), 1);
+//	}
+//	return 0;
+//}
 
-			if (onlynew && feed->totalnew == 0)
-				continue;
-		}
-		return MAX(MIN(win.width - 1, size), 0);
-	case LayoutHorizontal:
-		for (i = 0, size = 0; i < nfeeds; i++) {
-			feed = &feeds[i];
-			if (onlynew && feed->totalnew == 0)
-				continue;
-			size++;
-		}
-		return MAX(MIN((win.height - 1) / 2, size), 1);
-	}
-	return 0;
-}
+//static int
+//getsidebarsize(void)
+//{
+//	int size;
+//
+//	if ((size = fixedsidebarsizes[layout]) < 0)
+//		size = getsidebarsizedefault();
+//	return size;
+//}
 
-static int
-getsidebarsize(void)
-{
-	int size;
-
-	if ((size = fixedsidebarsizes[layout]) < 0)
-		size = getsidebarsizedefault();
-	return size;
-}
-
-static void
-adjustsidebarsize(int n)
-{
-	int size;
-
-	if ((size = fixedsidebarsizes[layout]) < 0)
-		size = getsidebarsizedefault();
-	if (n > 0) {
-		if ((layout == LayoutVertical && size + 1 < win.width) ||
-		    (layout == LayoutHorizontal && size + 1 < win.height))
-			size++;
-	} else if (n < 0) {
-		if ((layout == LayoutVertical && size > 0) ||
-		    (layout == LayoutHorizontal && size > 1))
-			size--;
-	}
-
-	if (size != fixedsidebarsizes[layout]) {
-		fixedsidebarsizes[layout] = size;
-		updategeom();
-	}
-}
+//static void
+//adjustsidebarsize(int n)
+//{
+//	int size;
+//
+//	if ((size = fixedsidebarsizes[layout]) < 0)
+//		size = getsidebarsizedefault();
+//	if (n > 0) {
+//		if ((layout == LayoutVertical && size + 1 < win.width) ||
+//		    (layout == LayoutHorizontal && size + 1 < win.height))
+//			size++;
+//	} else if (n < 0) {
+//		if ((layout == LayoutVertical && size > 0) ||
+//		    (layout == LayoutHorizontal && size > 1))
+//			size--;
+//	}
+//
+//	if (size != fixedsidebarsizes[layout]) {
+//		fixedsidebarsizes[layout] = size;
+//		updategeom();
+//	}
+//}
 
 static void
 updatesidebar(void)
@@ -1547,16 +1553,16 @@ updatesidebar(void)
 		p->rows = ecalloc(sizeof(p->rows[0]), nfeeds + 1);
 
 	switch (layout) {
-	case LayoutVertical:
-		oldvalue = p->width;
-		newvalue = getsidebarsize();
-		p->width = newvalue;
-		break;
-	case LayoutHorizontal:
-		oldvalue = p->height;
-		newvalue = getsidebarsize();
-		p->height = newvalue;
-		break;
+//	case LayoutVertical:
+//		oldvalue = p->width;
+//		newvalue = getsidebarsize();
+//		p->width = newvalue;
+//		break;
+//	case LayoutHorizontal:
+//		oldvalue = p->height;
+//		newvalue = getsidebarsize();
+//		p->height = newvalue;
+//		break;
 	}
 
 	nrows = 0;
@@ -1848,7 +1854,8 @@ markread(struct pane *p, off_t from, off_t to, int isread)
 	if (!urlfile || !p->nrows)
 		return;
 
-	cmd = isread ? markreadcmd : markunreadcmd;
+	cmd = isread ? markreadcmd : NULL;
+//	cmd = isread ? markreadcmd : markunreadcmd;
 
 	switch ((pid = fork())) {
 	case -1:
@@ -1987,16 +1994,17 @@ main(int argc, char *argv[])
 		piperia = !strcmp(tmp, "1");
 	if ((tmp = getenv("SFEED_YANKER_INTERACTIVE")))
 		yankeria = !strcmp(tmp, "1");
-	if ((tmp = getenv("SFEED_MARK_READ")))
-		markreadcmd = tmp;
-	if ((tmp = getenv("SFEED_MARK_UNREAD")))
-		markunreadcmd = tmp;
+//	if ((tmp = getenv("SFEED_MARK_READ")))
+//		markreadcmd = tmp;
+//	if ((tmp = getenv("SFEED_MARK_UNREAD")))
+//		markunreadcmd = tmp;
 	if ((tmp = getenv("SFEED_LAZYLOAD")))
 		lazyload = !strcmp(tmp, "1");
-	urlfile = getenv("SFEED_URL_FILE"); /* can be NULL */
+//	urlfile = getenv("SFEED_URL_FILE"); /* can be NULL */
 	cmdenv = getenv("SFEED_AUTOCMD"); /* can be NULL */
 
-	setlayout(argc <= 1 ? LayoutMonocle : LayoutVertical);
+//	setlayout(argc <= 1 ? LayoutMonocle : LayoutVertical);
+//	setlayout(argc <= 1 ? LayoutMonocle : NULL);
 	selpane = layout == LayoutMonocle ? PaneItems : PaneFeeds;
 
 	panes[PaneFeeds].row_format = feed_row_format;
@@ -2190,17 +2198,18 @@ keyright:
 				}
 			}
 			break;
-		case 'J':
-			p = &panes[selpane];
-			if (!p->nrows)
-				break;
-			for (pos = p->pos + 1; pos < p->nrows; pos++) {
-				if ((row = pane_row_get(p, pos)) && row->bold) {
-					pane_setpos(p, pos);
-					break;
-				}
-			}
-			break;
+//		case 'J':
+//			p = &panes[selpane];
+//			if (!p->nrows)
+//				break;
+//			for (pos = p->pos + 1; pos < p->nrows; pos++) {
+//				if ((row = pane_row_get(p, pos)) && row->bold) {
+//					pane_setpos(p, pos);
+//					break;
+//				}
+//			}
+//			break;
+
 		case '\t':
 			selpane = selpane == PaneFeeds ? PaneItems : PaneFeeds;
 			if (layout == LayoutMonocle)
@@ -2277,35 +2286,35 @@ nextpage:
 			if (selpane == PaneItems)
 				feed_plumb_selected_item(&panes[selpane], FieldEnclosure);
 			break;
-		case 'm': /* toggle mouse mode */
-			usemouse = !usemouse;
-			mousemode(usemouse);
-			break;
+//		case 'm': /* toggle mouse mode */
+//			usemouse = !usemouse;
+//			mousemode(usemouse);
+//			break;
 		case '<': /* decrease fixed sidebar width */
-		case '>': /* increase fixed sidebar width */
-			adjustsidebarsize(ch == '<' ? -1 : +1);
-			break;
-		case '=': /* reset fixed sidebar to automatic size */
-			fixedsidebarsizes[layout] = -1;
-			updategeom();
-			break;
-		case 't': /* toggle showing only new in sidebar */
-			p = &panes[PaneFeeds];
-			if ((row = pane_row_get(p, p->pos)))
-				f = row->data;
-			else
-				f = NULL;
-
-			onlynew = !onlynew;
-			updatesidebar();
-
-			/* try to find the same feed in the pane */
-			if (f && f->totalnew &&
-			    (pos = feeds_row_get(p, f)) != -1)
-				pane_setpos(p, pos);
-			else
-				pane_setpos(p, 0);
-			break;
+//		case '>': /* increase fixed sidebar width */
+//			adjustsidebarsize(ch == '<' ? -1 : +1);
+//			break;
+//		case '=': /* reset fixed sidebar to automatic size */
+//			fixedsidebarsizes[layout] = -1;
+//			updategeom();
+//			break;
+//		case 't': /* toggle showing only new in sidebar */
+//			p = &panes[PaneFeeds];
+//			if ((row = pane_row_get(p, p->pos)))
+//				f = row->data;
+//			else
+//				f = NULL;
+//
+//			onlynew = !onlynew;
+//			updatesidebar();
+//
+//			/* try to find the same feed in the pane */
+//			if (f && f->totalnew &&
+//			    (pos = feeds_row_get(p, f)) != -1)
+//				pane_setpos(p, pos);
+//			else
+//				pane_setpos(p, 0);
+//			break;
 		case 'o': /* feeds: load, items: plumb URL */
 		case '\n':
 			if (selpane == PaneFeeds && panes[selpane].nrows)
@@ -2326,31 +2335,42 @@ nextpage:
 				                        ch == 'y' ? FieldLink : FieldEnclosure);
 			break;
 		case 'f': /* mark all read */
-		case 'F': /* mark all unread */
 			if (panes[PaneItems].nrows) {
 				p = &panes[PaneItems];
 				markread(p, 0, p->nrows - 1, ch == 'f');
 			}
 			break;
+
+//		case 'F': /* mark all unread */
 		case 'r': /* mark item as read */
-		case 'u': /* mark item as unread */
-			if (selpane == PaneItems && panes[selpane].nrows) {
-				p = &panes[selpane];
-				markread(p, p->pos, p->pos, ch == 'r');
-				pane_scrolln(&panes[selpane], +1);
+			p = &panes[selpane];
+			if (!p->nrows)
+				break;
+			for (pos = p->pos + 1; pos < p->nrows; pos++) {
+				if ((row = pane_row_get(p, pos)) && row->bold) {
+					markread(p, p->pos, p->pos, ch == 'r');
+					pane_setpos(p, pos);
+					break;
+				}
 			}
 			break;
-		case 's': /* toggle layout between monocle or non-monocle */
-			setlayout(layout == LayoutMonocle ? prevlayout : LayoutMonocle);
-			updategeom();
-			break;
-		case '1': /* vertical layout */
-		case '2': /* horizontal layout */
-		case '3': /* monocle layout */
-			setlayout(ch - '1');
-			updategeom();
-			break;
-		case 4: /* EOT */
+//		case 'u': /* mark item as unread */
+//			if (selpane == PaneItems && panes[selpane].nrows) {
+//				p = &panes[selpane];
+//				markread(p, p->pos, p->pos, ch == 'r');
+//			}
+//			break;
+//		case 's': /* toggle layout between monocle or non-monocle */
+//			setlayout(layout == LayoutMonocle ? prevlayout : LayoutMonocle);
+//			updategeom();
+//			break;
+//		case '1': /* vertical layout */
+//		case '2': /* horizontal layout */
+//		case '1': /* monocle layout */
+//			setlayout(ch - '1');
+//			updategeom();
+//			break;
+//		case 4: /* EOT */
 		case 'q': goto end;
 		}
 event:
@@ -2394,3 +2414,4 @@ end:
 
 	return 0;
 }
+
