@@ -3,7 +3,7 @@
 # NOTE: assumes "sfeed_*" executables are in $PATH.
 
 # defaults
-sfeedpath="$HOME/.sfeed/feeds"
+sfeedpath="/home/user/.sfeed/feeds"
 
 # used for processing feeds concurrently: wait until ${maxjobs} amount of
 # feeds are finished at a time.
@@ -11,27 +11,27 @@ maxjobs=8
 
 # load config (evaluate shellscript).
 # loadconfig(configfile)
-loadconfig() {
-	# allow to specify config via argv[1].
-	if [ "$1" != "" ]; then
-		# get absolute path of config file required for including.
-		config="$1"
-		path=$(readlink -f "${config}" 2>/dev/null)
-	else
-		# default config location.
-		config="$HOME/.sfeed/sfeedrc"
-		path="${config}"
-	fi
-
-	# config is loaded here to be able to override $sfeedpath or functions.
-	if [ -r "${path}" ]; then
-		. "${path}"
-	else
-		printf "Configuration file \"%s\" cannot be read.\n" "${config}" >&2
-		echo "See the sfeedrc.example file or the sfeedrc(5) man page for an example." >&2
-		exit 1
-	fi
-}
+#loadconfig() {
+#	# allow to specify config via argv[1].
+#	if [ "$1" != "" ]; then
+#		# get absolute path of config file required for including.
+#		config="$1"
+#		path=$(readlink -f "${config}" 2>/dev/null)
+#	else
+#		# default config location.
+#		config="$HOME/.sfeed/sfeedrc"
+#		path="${config}"
+#	fi
+#
+#	# config is loaded here to be able to override $sfeedpath or functions.
+#	if [ -r "${path}" ]; then
+#		. "${path}"
+#	else
+#		printf "Configuration file \"%s\" cannot be read.\n" "${config}" >&2
+#		echo "See the sfeedrc.example file or the sfeedrc(5) man page for an example." >&2
+#		exit 1
+#	fi
+#}
 
 # log(name, s)
 log() {
@@ -47,22 +47,53 @@ log_error() {
 
 # fetch a feed via HTTP/HTTPS etc.
 # fetch(name, url, feedfile)
+#fetch() {
+#	# fail on redirects, hide User-Agent, timeout is 15 seconds.
+#	curl -L --max-redirs 0 -H "User-Agent:" -f -s -m 15 \
+#		"$2" 2>/dev/null
+#}
 fetch() {
-	# fail on redirects, hide User-Agent, timeout is 15 seconds.
-	curl -L --max-redirs 0 -H "User-Agent:" -f -s -m 15 \
+	etag="$HOME/.sfeed/etags/$(basename "$3")"
+	curl \
+		-L --max-redirs 0 -H "User-Agent:" -f -s -m 15 \
+		--compressed \
+		--etag-save "${etag}" --etag-compare "${etag}" \
+		-z "${etag}" \
 		"$2" 2>/dev/null
 }
-
 # convert encoding from one encoding to another.
 # convertencoding(name, from, to)
-convertencoding() {
-	if [ "$2" != "" ] && [ "$3" != "" ] && [ "$2" != "$3" ]; then
-		iconv -cs -f "$2" -t "$3" 2> /dev/null
-	else
-		# else no convert, just output.
-		cat
-	fi
-}
+ #convertencoding() {
+ #	if [ "$2" != "" ] && [ "$3" != "" ] && [ "$2" != "$3" ]; then
+ #		uconv -cs -f "$2" -t "$3" 2> /dev/null
+ #	else
+ #		# else no convert, just output.
+ #		cat
+ #	fi
+ #}
+  convertencoding() {
+ 	if [ "$1" != "" ] && [ "$2" != "" ] && [ "$1" != "$2" ]; then
+ 		uconv -cs -f "$1" -t "$2" 2> /dev/null
+ 	else
+ 		# else no convert, just output.
+ 		cat
+ 	fi
+ }
+#Russian-Latin/BGN
+
+#convertencoding() {
+#        name="11"
+#	from="utf-8"
+#	to="russian-latin/bgn"
+#	if [ "$2" = "" ] && [ "$3" = "" ] && [ "$2" != "$3"]; then
+#		uconv -c -f "$2" -t "$3" 2> /dev/null
+#	else
+#		# else no convert, just output.
+#		cat
+#	fi
+#}
+#
+
 
 # parse and convert input, by default XML to the sfeed(5) TSV format.
 # parse(name, feedurl, basesiteurl)
@@ -71,10 +102,69 @@ parse() {
 }
 
 # filter fields.
-# filter(name, url)
+# filter(name)
+#filter() {
+#	cat
+#}
 filter() {
-	cat
-}
+		case "$1" in
+		"tweakers")
+			awk -F '\t' 'BEGIN { OFS = "\t"; }
+			# skip ads.
+			$2 ~ /^ADV:/ {
+				next;
+			}
+			# shorten link.
+			{
+				if (match($3, /^https:\/\/tweakers\.net\/[a-z]+\/[0-9]+\//)) {
+					$3 = substr($3, RSTART, RLENGTH);
+				}
+				print $0;
+			}';;
+		"example__" | "example" | "example__" | "example_")
+			awk -F '\t' '$9 !~ /Sport/' ;;
+		*)
+			cat;;
+		esac | \
+			# replace youtube links with embed links.
+			sed 's@www.youtube.com/watch?v=@www.youtube.com/embed/@g' | \
+
+			awk -F '\t' 'BEGIN { OFS = "\t"; }
+			function filterlink(s) {
+				# protocol must start with http, https or gopher.
+				if (match(s, /^(http|https|gopher):\/\//) == 0) {
+					return "";
+				}
+
+				# shorten feedburner links.
+				if (match(s, /^(http|https):\/\/[^\/]+\/~r\/.*\/~3\/[^\/]+\//)) {
+					s = substr($3, RSTART, RLENGTH);
+				}
+
+				# strip tracking parameters
+				# urchin, facebook, piwik, webtrekk and generic.
+				gsub(/\?(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "?", s);
+				gsub(/&(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "", s);
+
+				gsub(/\?&/, "?", s);
+				gsub(/[\?&]+$/, "", s);
+
+				return s
+			}
+			{
+				$3 = filterlink($3); # link
+				$8 = filterlink($8); # enclosure
+
+				# try to remove tracking pixels: <img/> tags with 1px width or height.
+				gsub("<img[^>]*(width|height)[[:space:]]*=[[:space:]]*[\"'"'"' ]?1[\"'"'"' ]?[^0-9>]+[^>]*>", "", $4);
+
+				print $0;
+			}'
+	}
+
+
+
+
 
 # merge raw files: unique sort by id, title, link.
 # merge(name, oldfile, newfile)
@@ -83,7 +173,7 @@ merge() {
 }
 
 # order by timestamp (descending).
-# order(name, url)
+# order(name)
 order() {
 	sort -t '	' -k1rn,1
 }
@@ -95,8 +185,10 @@ _feed() {
 	feedurl="$2"
 	basesiteurl="$3"
 	encoding="$4"
+#:	encoding_="$5"
 
-	filename="$(printf '%s' "${name}" | tr '/' '_')"
+#	filename="$(printf '%s' "${name}" | tr '/' '_')"
+	filename="$(printf '%s' "${name}")"
 	sfeedfile="${sfeedpath}/${filename}"
 	tmpfeedfile="${sfeedtmpdir}/feeds/${filename}"
 
@@ -104,17 +196,25 @@ _feed() {
 	[ -e "${sfeedfile}" ] || touch "${sfeedfile}" 2>/dev/null
 
 	if ! fetch "${name}" "${feedurl}" "${sfeedfile}" > "${tmpfeedfile}.fetch"; then
-		log_error "${name}" "FAIL (FETCH)"
+		log_error "${feedurl}" "FAIL (FETCH)"
+#		log_error "${name}" "FAIL (FETCH)"
 		return 1
 	fi
 
 	# try to detect encoding (if not specified). if detecting the encoding fails assume utf-8.
-	[ "${encoding}" = "" ] && encoding=$(sfeed_xmlenc < "${tmpfeedfile}.fetch")
+#	[ "${encoding}" = "" ] && encoding=$(sfeed_xmlenc < "${tmpfeedfile}.fetch")
+
+        encoding="utf-8"
 
 	if ! convertencoding "${name}" "${encoding}" "utf-8" < "${tmpfeedfile}.fetch" > "${tmpfeedfile}.utf8"; then
 		log_error "${name}" "FAIL (ENCODING)"
 		return 1
 	fi
+
+#	if ! convertencoding "${name}" "${encoding}" "utf-8" < "${tmpfeedfile}.fetch" > "${tmpfeedfile}.utf8"; then
+#		log_error "${name}" "FAIL (ENCODING)"
+#		return 1
+#	fi
 	rm -f "${tmpfeedfile}.fetch"
 
 	# if baseurl is empty then use feedurl.
@@ -124,7 +224,7 @@ _feed() {
 	fi
 	rm -f "${tmpfeedfile}.utf8"
 
-	if ! filter "${name}" "${feedurl}" < "${tmpfeedfile}.tsv" > "${tmpfeedfile}.filter"; then
+	if ! filter "${name}" < "${tmpfeedfile}.tsv" > "${tmpfeedfile}.filter"; then
 		log_error "${name}" "FAIL (FILTER)"
 		return 1
 	fi
@@ -142,7 +242,7 @@ _feed() {
 	fi
 	rm -f "${tmpfeedfile}.filter"
 
-	if ! order "${name}" "${feedurl}" < "${tmpfeedfile}.merge" > "${tmpfeedfile}.order"; then
+	if ! order "${name}" < "${tmpfeedfile}.merge" > "${tmpfeedfile}.order"; then
 		log_error "${name}" "FAIL (ORDER)"
 		return 1
 	fi
@@ -187,8 +287,8 @@ sighandler() {
 }
 
 feeds() {
-	printf "Configuration file \"%s\" is invalid or does not contain a \"feeds\" function.\n" "${config}" >&2
-	echo "See sfeedrc.example for an example." >&2
+#	printf "Configuration file \"%s\" is invalid or does not contain a \"feeds\" function.\n" "${config}" >&2
+#	echo "See sfeedrc.example for an example." >&2
 }
 
 main() {
@@ -201,13 +301,13 @@ main() {
 	# SIGTERM: signal to terminate parent.
 	trap -- "sighandler 15" "TERM"
 	# load config file.
-	loadconfig "$1"
+#	loadconfig "$1"
 	# fetch feeds and store in temporary directory.
 	sfeedtmpdir="$(mktemp -d '/tmp/sfeed_XXXXXX')" || exit 1
 	mkdir -p "${sfeedtmpdir}/feeds"
 	touch "${sfeedtmpdir}/ok" || exit 1
 	# make sure path exists.
-	mkdir -p "${sfeedpath}"
+#	mkdir -p "${sfeedpath}"
 	# fetch feeds specified in config file.
 	feeds
 	# wait till all feeds are fetched (concurrently).
