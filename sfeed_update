@@ -3,7 +3,7 @@
 # NOTE: assumes "sfeed_*" executables are in $PATH.
 
 # defaults
-sfeedpath="/home/user/.sfeed/feeds"
+sfeedpath="$HOME/.sfeed/feeds"
 
 # used for processing feeds concurrently: wait until ${maxjobs} amount of
 # feeds are finished at a time.
@@ -71,8 +71,8 @@ fetch() {
  #		cat
  #	fi
  #}
-  convertencoding() {
- 	if [ "$1" != "" ] && [ "$2" != "" ] && [ "$1" != "$2" ]; then
+convertencoding() {
+ 	if [ "$2" != "" ] && [ "$3" != "" ] && [ "$2" != "$3" ]; then
  		uconv -cs -f "$1" -t "$2" 2> /dev/null
  	else
  		# else no convert, just output.
@@ -103,64 +103,64 @@ parse() {
 
 # filter fields.
 # filter(name)
-#filter() {
-#	cat
-#}
 filter() {
-		case "$1" in
-		"tweakers")
-			awk -F '\t' 'BEGIN { OFS = "\t"; }
-			# skip ads.
-			$2 ~ /^ADV:/ {
-				next;
-			}
-			# shorten link.
-			{
-				if (match($3, /^https:\/\/tweakers\.net\/[a-z]+\/[0-9]+\//)) {
-					$3 = substr($3, RSTART, RLENGTH);
-				}
-				print $0;
-			}';;
-		"example__" | "example" | "example__" | "example_")
-			awk -F '\t' '$9 !~ /Sport/' ;;
-		*)
-			cat;;
-		esac | \
-			# replace youtube links with embed links.
-			sed 's@www.youtube.com/watch?v=@www.youtube.com/embed/@g' | \
-
-			awk -F '\t' 'BEGIN { OFS = "\t"; }
-			function filterlink(s) {
-				# protocol must start with http, https or gopher.
-				if (match(s, /^(http|https|gopher):\/\//) == 0) {
-					return "";
-				}
-
-				# shorten feedburner links.
-				if (match(s, /^(http|https):\/\/[^\/]+\/~r\/.*\/~3\/[^\/]+\//)) {
-					s = substr($3, RSTART, RLENGTH);
-				}
-
-				# strip tracking parameters
-				# urchin, facebook, piwik, webtrekk and generic.
-				gsub(/\?(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "?", s);
-				gsub(/&(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "", s);
-
-				gsub(/\?&/, "?", s);
-				gsub(/[\?&]+$/, "", s);
-
-				return s
-			}
-			{
-				$3 = filterlink($3); # link
-				$8 = filterlink($8); # enclosure
-
-				# try to remove tracking pixels: <img/> tags with 1px width or height.
-				gsub("<img[^>]*(width|height)[[:space:]]*=[[:space:]]*[\"'"'"' ]?1[\"'"'"' ]?[^0-9>]+[^>]*>", "", $4);
-
-				print $0;
-			}'
-	}
+	cat
+}
+#filter() {
+#		case "$1" in
+#		"tweakers")
+#			awk -F '\t' 'BEGIN { OFS = "\t"; }
+#			# skip ads.
+#			$2 ~ /^ADV:/ {
+#				next;
+#			}
+#			# shorten link.
+#			{
+#				if (match($3, /^https:\/\/tweakers\.net\/[a-z]+\/[0-9]+\//)) {
+#					$3 = substr($3, RSTART, RLENGTH);
+#				}
+#				print $0;
+#			}';;
+#		"example__" | "example" | "example__" | "example_")
+#			awk -F '\t' '$9 !~ /Sport/' ;;
+#		*)
+#			cat;;
+#		esac | \
+#			# replace youtube links with embed links.
+#			sed 's@www.youtube.com/watch?v=@www.youtube.com/embed/@g' | \
+#
+#			awk -F '\t' 'BEGIN { OFS = "\t"; }
+#			function filterlink(s) {
+#				# protocol must start with http, https or gopher.
+#				if (match(s, /^(http|https|gopher):\/\//) == 0) {
+#					return "";
+#				}
+#
+#				# shorten feedburner links.
+#				if (match(s, /^(http|https):\/\/[^\/]+\/~r\/.*\/~3\/[^\/]+\//)) {
+#					s = substr($3, RSTART, RLENGTH);
+#				}
+#
+#				# strip tracking parameters
+#				# urchin, facebook, piwik, webtrekk and generic.
+#				gsub(/\?(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "?", s);
+#				gsub(/&(ad|campaign|fbclid|pk|tm|utm|wt)_([^&]+)/, "", s);
+#
+#				gsub(/\?&/, "?", s);
+#				gsub(/[\?&]+$/, "", s);
+#
+#				return s
+#			}
+#			{
+#				$3 = filterlink($3); # link
+#				$8 = filterlink($8); # enclosure
+#
+#				# try to remove tracking pixels: <img/> tags with 1px width or height.
+#				gsub("<img[^>]*(width|height)[[:space:]]*=[[:space:]]*[\"'"'"' ]?1[\"'"'"' ]?[^0-9>]+[^>]*>", "", $4);
+#
+#				print $0;
+#			}'
+#	}
 
 
 
